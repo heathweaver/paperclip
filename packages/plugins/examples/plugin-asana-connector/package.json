@@ -14,7 +14,7 @@
   },
   "scripts": {
     "prebuild": "node ../../../../scripts/ensure-plugin-build-deps.mjs",
-    "build": "tsc && node ./scripts/build-ui.mjs",
+    "build": "tsc && node ./scripts/bundle-runtime.mjs && node ./scripts/build-ui.mjs",
     "clean": "rm -rf dist",
     "test": "vitest run --config ./vitest.config.ts",
     "typecheck": "pnpm --filter @paperclipai/plugin-sdk build && tsc --noEmit"
