@@ -1,5 +1,4 @@
 import { definePlugin, runWorker } from "@paperclipai/plugin-sdk";
-import { spawn, type ChildProcess } from "node:child_process";
 
 // ---------------------------------------------------------------------------
 // MCP JSON-RPC types (minimal subset)
@@ -19,6 +18,12 @@ interface JsonRpcResponse {
   error?: { code: number; message: string };
 }
 
+interface JsonRpcNotification {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+}
+
 interface McpToolDeclaration {
   name: string;
   description?: string;
@@ -35,98 +40,97 @@ interface McpToolResult {
 // ---------------------------------------------------------------------------
 
 interface AsanaMcpConfig {
-  accessTokenRef?: string;
+  mcpUrl?: string;
+  authTokenRef?: string;
   defaultWorkspaceGid?: string;
-  mcpCommand?: string;
-  mcpArgs?: string;
 }
 
 // ---------------------------------------------------------------------------
-// MCP stdio client — lightweight JSON-RPC over stdin/stdout
+// MCP HTTP client — lightweight JSON-RPC over a remote HTTPS endpoint
 // ---------------------------------------------------------------------------
 
-class McpStdioClient {
-  private proc: ChildProcess | null = null;
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+class McpHttpClient {
   private nextId = 1;
-  private pending = new Map<number, { resolve: (v: JsonRpcResponse) => void; reject: (e: Error) => void }>();
-  private buffer = "";
+  private sessionId: string | null = null;
+  private started = false;
 
   constructor(
-    private command: string,
-    private args: string[],
-    private env: Record<string, string>,
+    private url: string,
+    private authToken: string | null,
+    private fetcher: FetchLike,
     private logger: { info: (m: string, meta?: Record<string, unknown>) => void; error: (m: string, meta?: Record<string, unknown>) => void },
   ) {}
 
   async start(): Promise<void> {
-    this.proc = spawn(this.command, this.args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, ...this.env },
-    });
-
-    this.proc.stdout?.on("data", (chunk: Buffer) => {
-      this.buffer += chunk.toString();
-      this.processBuffer();
-    });
-
-    this.proc.stderr?.on("data", (chunk: Buffer) => {
-      this.logger.error("MCP server stderr", { text: chunk.toString().trim() });
-    });
-
-    this.proc.on("exit", (code) => {
-      this.logger.info(`MCP server exited with code ${code}`);
-      for (const p of this.pending.values()) p.reject(new Error("MCP server exited"));
-      this.pending.clear();
-    });
-
-    // Initialize MCP session
+    if (this.started) return;
     await this.send("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: { name: "paperclip-asana-connector", version: "0.1.0" },
     });
     await this.notify("notifications/initialized", {});
+    this.started = true;
   }
 
-  private processBuffer(): void {
-    // MCP stdio uses newline-delimited JSON
-    let newlineIdx: number;
-    while ((newlineIdx = this.buffer.indexOf("\n")) !== -1) {
-      const line = this.buffer.slice(0, newlineIdx).trim();
-      this.buffer = this.buffer.slice(newlineIdx + 1);
-      if (!line) continue;
-      try {
-        const msg = JSON.parse(line) as JsonRpcResponse;
-        if (msg.id !== undefined && this.pending.has(msg.id)) {
-          this.pending.get(msg.id)!.resolve(msg);
-          this.pending.delete(msg.id);
-        }
-      } catch {
-        // skip malformed lines
-      }
+  private buildHeaders(): HeadersInit {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    };
+    if (this.authToken) {
+      headers.authorization = `Bearer ${this.authToken}`;
     }
+    if (this.sessionId) {
+      headers["mcp-session-id"] = this.sessionId;
+    }
+    return headers;
+  }
+
+  private async post(body: JsonRpcRequest | JsonRpcNotification): Promise<JsonRpcResponse | null> {
+    const response = await this.fetcher(this.url, {
+      method: "POST",
+      headers: this.buildHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    const sessionId = response.headers.get("mcp-session-id");
+    if (sessionId) {
+      this.sessionId = sessionId;
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Remote MCP request failed (${response.status}): ${text || response.statusText}`);
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      const text = await response.text().catch(() => "");
+      if (!text.trim()) return null;
+      throw new Error(`Unsupported MCP response content-type: ${contentType || "unknown"}`);
+    }
+
+    return (await response.json()) as JsonRpcResponse;
   }
 
   async send(method: string, params?: unknown): Promise<unknown> {
-    if (!this.proc?.stdin?.writable) throw new Error("MCP server not running");
     const id = this.nextId++;
     const req: JsonRpcRequest = { jsonrpc: "2.0", id, method, params };
-    return new Promise<unknown>((resolve, reject) => {
-      this.pending.set(id, {
-        resolve: (resp) => {
-          if (resp.error) reject(new Error(resp.error.message));
-          else resolve(resp.result);
-        },
-        reject,
-      });
-      this.proc!.stdin!.write(JSON.stringify(req) + "\n");
-    });
+    const resp = await this.post(req);
+    if (!resp) {
+      throw new Error(`Remote MCP request '${method}' returned no response body`);
+    }
+    if (resp.error) {
+      throw new Error(resp.error.message);
+    }
+    return resp.result;
   }
 
   async notify(method: string, params?: unknown): Promise<void> {
-    if (!this.proc?.stdin?.writable) return;
-    const msg = { jsonrpc: "2.0", method, params };
-    this.proc.stdin.write(JSON.stringify(msg) + "\n");
+    const msg: JsonRpcNotification = { jsonrpc: "2.0", method, params };
+    await this.post(msg);
   }
 
   async listTools(): Promise<McpToolDeclaration[]> {
@@ -139,12 +143,12 @@ class McpStdioClient {
   }
 
   stop(): void {
-    this.proc?.kill("SIGTERM");
-    this.proc = null;
+    this.started = false;
+    this.sessionId = null;
   }
 
   get isRunning(): boolean {
-    return this.proc !== null && !this.proc.killed;
+    return this.started;
   }
 }
 
@@ -158,8 +162,9 @@ const plugin = definePlugin({
   async setup(ctx) {
     ctx.logger.info(`${PLUGIN_NAME} setting up`);
 
-    let mcpClient: McpStdioClient | null = null;
+    let mcpClient: McpHttpClient | null = null;
     let discoveredTools: McpToolDeclaration[] = [];
+    let toolRegistrationRevision = 0;
 
     // ------ Resolve MCP server config ------
 
@@ -167,33 +172,33 @@ const plugin = definePlugin({
       return ((await ctx.config.get()) as AsanaMcpConfig | null) ?? {};
     }
 
-    async function ensureMcpClient(): Promise<McpStdioClient | null> {
+    async function ensureMcpClient(): Promise<McpHttpClient | null> {
       if (mcpClient?.isRunning) return mcpClient;
 
       const config = await getConfig();
-      const command = config.mcpCommand || "npx";
-      const rawArgs = config.mcpArgs || "-y @roychri/mcp-server-asana";
-      const args = rawArgs.split(/\s+/).filter(Boolean);
+      const mcpUrl = config.mcpUrl?.trim();
+      if (!mcpUrl) {
+        ctx.logger.warn("Missing remote MCP URL");
+        return null;
+      }
 
-      // Resolve the access token for the MCP server env
-      const env: Record<string, string> = {};
-      if (config.accessTokenRef) {
+      let authToken: string | null = null;
+      if (config.authTokenRef) {
         try {
-          const token = await ctx.secrets.resolve(config.accessTokenRef);
-          env.ASANA_ACCESS_TOKEN = token;
+          authToken = await ctx.secrets.resolve(config.authTokenRef);
         } catch {
-          ctx.logger.warn("Failed to resolve Asana access token");
+          ctx.logger.warn("Failed to resolve remote MCP auth token");
           return null;
         }
       }
 
-      mcpClient = new McpStdioClient(command, args, env, ctx.logger);
+      mcpClient = new McpHttpClient(mcpUrl, authToken, ctx.http.fetch, ctx.logger);
 
       try {
         await mcpClient.start();
-        ctx.logger.info("MCP server started");
+        ctx.logger.info("Remote MCP server connected", { mcpUrl });
       } catch (err) {
-        ctx.logger.error("Failed to start MCP server", { error: String(err) });
+        ctx.logger.error("Failed to connect to remote MCP server", { error: String(err), mcpUrl });
         mcpClient = null;
         return null;
       }
@@ -218,6 +223,8 @@ const plugin = definePlugin({
         return;
       }
 
+      toolRegistrationRevision += 1;
+      const currentRevision = toolRegistrationRevision;
       for (const tool of discoveredTools) {
         ctx.tools.register(
           tool.name,
@@ -227,6 +234,9 @@ const plugin = definePlugin({
             parametersSchema: tool.inputSchema ?? { type: "object" as const, properties: {} },
           },
           async (rawParams) => {
+            if (currentRevision !== toolRegistrationRevision) {
+              return { error: "Tool registration is stale. Refresh and retry." };
+            }
             const currentClient = await ensureMcpClient();
             if (!currentClient) return { error: "MCP server not available" };
 
@@ -255,9 +265,8 @@ const plugin = definePlugin({
     ctx.data.register("stats", async () => {
       const config = await getConfig();
       return {
-        isConfigured: !!config.accessTokenRef,
-        mcpCommand: config.mcpCommand || "npx",
-        mcpArgs: config.mcpArgs || "-y @roychri/mcp-server-asana",
+        isConfigured: !!config.mcpUrl,
+        mcpUrl: config.mcpUrl || "",
         toolCount: discoveredTools.length,
         toolNames: discoveredTools.map((t) => t.name),
         mcpRunning: mcpClient?.isRunning ?? false,
@@ -267,16 +276,15 @@ const plugin = definePlugin({
     ctx.data.register("config", async () => {
       const config = await getConfig();
       return {
-        hasToken: !!config.accessTokenRef,
+        hasToken: !!config.authTokenRef,
         defaultWorkspaceGid: config.defaultWorkspaceGid ?? "",
-        mcpCommand: config.mcpCommand ?? "npx",
-        mcpArgs: config.mcpArgs ?? "-y @roychri/mcp-server-asana",
+        mcpUrl: config.mcpUrl ?? "",
       };
     });
 
     ctx.actions.register("test-connection", async () => {
       const client = await ensureMcpClient();
-      if (!client) return { ok: false, error: "Could not start MCP server" };
+      if (!client) return { ok: false, error: "Could not connect to remote MCP server" };
       try {
         const tools = await client.listTools();
         return { ok: true, toolCount: tools.length, tools: tools.map((t) => t.name) };
@@ -298,7 +306,7 @@ const plugin = definePlugin({
   },
 
   async onShutdown() {
-    // Client cleanup happens via process exit
+    // Client cleanup happens by dropping the transient session state.
   },
 });
 

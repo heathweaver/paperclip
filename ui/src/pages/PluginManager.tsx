@@ -43,6 +43,16 @@ function getPluginErrorSummary(plugin: PluginRecord): string {
   return firstNonEmptyLine(plugin.lastError) ?? "Plugin entered an error state without a stored error message.";
 }
 
+function isLocalPluginPath(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("~")
+  );
+}
+
 /**
  * PluginManager page component.
  *
@@ -177,7 +187,7 @@ export function PluginManager() {
             <DialogHeader>
               <DialogTitle>Install Plugin</DialogTitle>
               <DialogDescription>
-                Enter the npm package name of the plugin you wish to install.
+                Enter an npm package name or a local filesystem path to the plugin directory.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -185,7 +195,7 @@ export function PluginManager() {
                 <Label htmlFor="packageName">npm Package Name</Label>
                 <Input
                   id="packageName"
-                  placeholder="@paperclipai/plugin-example"
+                  placeholder="@paperclipai/plugin-example or /paperclip/plugins/plugin-asana-connector"
                   value={installPackage}
                   onChange={(e) => setInstallPackage(e.target.value)}
                 />
@@ -194,7 +204,10 @@ export function PluginManager() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setInstallDialogOpen(false)}>Cancel</Button>
               <Button
-                onClick={() => installMutation.mutate({ packageName: installPackage })}
+                onClick={() => installMutation.mutate({
+                  packageName: installPackage.trim(),
+                  isLocalPath: isLocalPluginPath(installPackage),
+                })}
                 disabled={!installPackage || installMutation.isPending}
               >
                 {installMutation.isPending ? "Installing..." : "Install"}

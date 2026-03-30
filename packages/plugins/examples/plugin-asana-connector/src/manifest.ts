@@ -6,7 +6,7 @@ const manifest: PaperclipPluginManifestV1 = {
   version: "0.1.0",
   displayName: "Asana Connector",
   description:
-    "Thin MCP bridge — spawns your Asana MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
+    "Thin MCP bridge — connects to your remote Asana MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
   author: "Paperclip",
   categories: ["connector"],
 
@@ -24,32 +24,25 @@ const manifest: PaperclipPluginManifestV1 = {
   instanceConfigSchema: {
     type: "object",
     properties: {
-      accessTokenRef: {
+      mcpUrl: {
         type: "string",
-        title: "Asana Access Token (secret ref)",
+        title: "Remote MCP URL",
         description:
-          "Secret reference for the Asana PAT, injected as ASANA_ACCESS_TOKEN env var to the MCP server.",
+          "HTTPS URL for your remote Asana MCP server (for example https://asana.ssc.one/mcp).",
+      },
+      authTokenRef: {
+        type: "string",
+        title: "Remote MCP Auth Token (secret ref)",
+        description:
+          "Optional secret reference for a bearer token sent to the remote MCP server.",
       },
       defaultWorkspaceGid: {
         type: "string",
         title: "Default Workspace GID",
         description: "Default Asana workspace GID (optional).",
       },
-      mcpCommand: {
-        type: "string",
-        title: "MCP Server Command",
-        default: "npx",
-        description: "Command to launch the MCP server (default: npx).",
-      },
-      mcpArgs: {
-        type: "string",
-        title: "MCP Server Args",
-        default: "-y @roychri/mcp-server-asana",
-        description:
-          "Space-separated arguments for the MCP server command (e.g. '-y @roychri/mcp-server-asana').",
-      },
     },
-    required: ["accessTokenRef"],
+    required: ["mcpUrl"],
   },
 
   entrypoints: {

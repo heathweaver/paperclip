@@ -12,8 +12,7 @@ import { useState } from "react";
 
 interface AsanaStats {
   isConfigured: boolean;
-  mcpCommand: string;
-  mcpArgs: string;
+  mcpUrl: string;
   toolCount: number;
   toolNames: string[];
   mcpRunning: boolean;
@@ -22,8 +21,7 @@ interface AsanaStats {
 interface AsanaConfigView {
   hasToken: boolean;
   defaultWorkspaceGid: string;
-  mcpCommand: string;
-  mcpArgs: string;
+  mcpUrl: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +98,7 @@ export function AsanaPage({ context }: PluginPageProps) {
       <div>
         <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--foreground)", margin: 0 }}>Asana Connector</h2>
         <p style={{ fontSize: "13px", color: "var(--muted-foreground)", margin: "4px 0 0" }}>
-          Thin MCP bridge — spawns your Asana MCP server and proxies its tools to Paperclip agents.
+          Thin MCP bridge — connects to your remote Asana MCP server and proxies its tools to Paperclip agents.
         </p>
       </div>
 
@@ -114,7 +112,7 @@ export function AsanaPage({ context }: PluginPageProps) {
         </div>
         {stats && (
           <div style={{ fontSize: "12px", color: "var(--muted-foreground)", marginBottom: "12px" }}>
-            <span style={mono}>{stats.mcpCommand} {stats.mcpArgs}</span>
+            <span style={mono}>{stats.mcpUrl || "Remote MCP URL not configured"}</span>
           </div>
         )}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
@@ -142,8 +140,8 @@ export function AsanaPage({ context }: PluginPageProps) {
       <div style={card}>
         <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>How it works</div>
         <ol style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "var(--muted-foreground)", lineHeight: 1.8 }}>
-          <li>Configure your Asana PAT secret ref and MCP server command in Settings.</li>
-          <li>On startup, the plugin spawns the MCP server and calls <code>tools/list</code>.</li>
+          <li>Configure your remote MCP URL and optional auth token secret ref in Settings.</li>
+          <li>On startup, the plugin connects to that MCP server and calls <code>tools/list</code>.</li>
           <li>Each discovered tool is registered as a Paperclip agent tool.</li>
           <li>When an agent invokes a tool, the plugin proxies the call via <code>tools/call</code>.</li>
         </ol>
@@ -157,7 +155,7 @@ export function AsanaPage({ context }: PluginPageProps) {
             <tbody>
               <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--muted-foreground)" }}>Access Token</td><td style={{ fontWeight: 500 }}>{config.hasToken ? "Configured" : "Not set"}</td></tr>
               <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--muted-foreground)" }}>Default Workspace</td><td style={{ fontWeight: 500 }}>{config.defaultWorkspaceGid || "—"}</td></tr>
-              <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--muted-foreground)" }}>MCP Command</td><td style={{ fontWeight: 500 }}><span style={mono}>{config.mcpCommand} {config.mcpArgs}</span></td></tr>
+              <tr><td style={{ padding: "4px 8px 4px 0", color: "var(--muted-foreground)" }}>Remote MCP URL</td><td style={{ fontWeight: 500 }}><span style={mono}>{config.mcpUrl || "—"}</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -188,16 +186,16 @@ export function AsanaSettings({ context }: PluginSettingsPageProps) {
       <div>
         <h3 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>Asana Settings</h3>
         <p style={{ fontSize: "12px", color: "var(--muted-foreground)", margin: "4px 0 0" }}>
-          Configure the Asana PAT and MCP server command via the plugin instance config.
+          Configure the remote MCP URL and optional auth token via the plugin instance config.
         </p>
       </div>
       <div style={card}>
         <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px" }}>Test MCP Connection</div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <button type="button" style={btn} onClick={handleTest}>Test</button>
-          {config?.hasToken ? <span style={badgeStyle("oklch(0.72 0.17 142)")}>Token set</span> : <span style={badgeStyle("oklch(0.80 0.15 85)")}>No token</span>}
+          {config?.hasToken ? <span style={badgeStyle("oklch(0.72 0.17 142)")}>Auth token set</span> : <span style={badgeStyle("oklch(0.80 0.15 85)")}>No auth token</span>}
         </div>
-        {config && <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted-foreground)" }}>Server: <span style={mono}>{config.mcpCommand} {config.mcpArgs}</span></div>}
+        {config && <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted-foreground)" }}>Server: <span style={mono}>{config.mcpUrl || "Not configured"}</span></div>}
         {status && <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted-foreground)" }}>{status}</div>}
       </div>
     </div>
