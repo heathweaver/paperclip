@@ -16,6 +16,7 @@ import {
   projects,
   projectWorkspaces,
 } from "@paperclipai/db";
+import { plugins, pluginConfig } from "@paperclipai/db";
 import { conflict, notFound } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { publishLiveEvent } from "./live-events.js";
@@ -2576,6 +2577,31 @@ export function heartbeatService(db: Db) {
           "local agent jwt secret missing or invalid; running without injected PAPERCLIP_API_KEY",
         );
       }
+      // Inject ready plugin MCP servers into context for adapter consumption
+      try {
+        const mcpRows = await db
+          .select({
+            pluginKey: plugins.pluginKey,
+            configJson: pluginConfig.configJson,
+          })
+          .from(plugins)
+          .innerJoin(pluginConfig, eq(pluginConfig.pluginId, plugins.id))
+          .where(eq(plugins.status, "ready"));
+        const mcpServers: Array<{ name: string; url: string; authToken?: string }> = [];
+        for (const row of mcpRows) {
+          const cfg = row.configJson as Record<string, unknown> | null;
+          const url = typeof cfg?.mcpUrl === "string" ? cfg.mcpUrl.trim() : "";
+          if (!url) continue;
+          const token = typeof cfg?.authToken === "string" ? cfg.authToken.trim() : undefined;
+          mcpServers.push({ name: row.pluginKey, url, authToken: token || undefined });
+        }
+        if (mcpServers.length > 0) {
+          context.paperclipMcpServers = mcpServers;
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to load plugin MCP servers for agent context");
+      }
+
       const adapterResult = await adapter.execute({
         runId: run.id,
         agent,

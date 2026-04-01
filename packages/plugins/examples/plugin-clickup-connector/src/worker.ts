@@ -53,11 +53,10 @@ function parseSseJsonResponse(text: string): JsonRpcResponse | null {
 // Config
 // ---------------------------------------------------------------------------
 
-interface AsanaMcpConfig {
+interface ClickUpMcpConfig {
   mcpUrl?: string;
   authToken?: string;
   authTokenRef?: string;
-  defaultWorkspaceGid?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +82,7 @@ class McpHttpClient {
     await this.send("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "paperclip-asana-connector", version: "0.1.0" },
+      clientInfo: { name: "paperclip-clickup-connector", version: "0.1.0" },
     });
     await this.notify("notifications/initialized", {});
     this.started = true;
@@ -178,7 +177,7 @@ class McpHttpClient {
 // Plugin
 // ---------------------------------------------------------------------------
 
-const PLUGIN_NAME = "asana-connector";
+const PLUGIN_NAME = "clickup-connector";
 
 const plugin = definePlugin({
   async setup(ctx) {
@@ -190,8 +189,8 @@ const plugin = definePlugin({
 
     // ------ Resolve MCP server config ------
 
-    async function getConfig(): Promise<AsanaMcpConfig> {
-      return ((await ctx.config.get()) as AsanaMcpConfig | null) ?? {};
+    async function getConfig(): Promise<ClickUpMcpConfig> {
+      return ((await ctx.config.get()) as ClickUpMcpConfig | null) ?? {};
     }
 
     async function ensureMcpClient(): Promise<McpHttpClient | null> {
@@ -252,7 +251,7 @@ const plugin = definePlugin({
           tool.name,
           {
             displayName: tool.name,
-            description: tool.description ?? `Asana MCP tool: ${tool.name}`,
+            description: tool.description ?? `ClickUp MCP tool: ${tool.name}`,
             parametersSchema: tool.inputSchema ?? { type: "object" as const, properties: {} },
           },
           async (rawParams) => {
@@ -298,8 +297,7 @@ const plugin = definePlugin({
     ctx.data.register("config", async () => {
       const config = await getConfig();
       return {
-        hasToken: !!config.authTokenRef,
-        defaultWorkspaceGid: config.defaultWorkspaceGid ?? "",
+        hasToken: !!(config.authToken || config.authTokenRef),
         mcpUrl: config.mcpUrl ?? "",
       };
     });

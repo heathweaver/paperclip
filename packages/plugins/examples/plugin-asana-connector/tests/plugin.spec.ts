@@ -20,6 +20,16 @@ function jsonResponse(body: unknown, init?: { headers?: Record<string, string> }
   });
 }
 
+function sseJsonResponse(body: unknown, init?: { headers?: Record<string, string> }) {
+  return new Response(`event: message\ndata: ${JSON.stringify(body)}\n\n`, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream",
+      ...(init?.headers ?? {}),
+    },
+  });
+}
+
 describe("plugin-asana-connector", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -30,14 +40,14 @@ describe("plugin-asana-connector", () => {
       const body = JSON.parse(String(init?.body ?? "{}")) as MockJsonRpcRequest;
       switch (body.method) {
         case "initialize":
-          return jsonResponse(
+          return sseJsonResponse(
             { jsonrpc: "2.0", id: body.id, result: { serverInfo: { name: "asana-mcp" } } },
             { headers: { "mcp-session-id": "session-1" } },
           );
         case "notifications/initialized":
           return new Response("", { status: 202, headers: { "mcp-session-id": "session-1" } });
         case "tools/list":
-          return jsonResponse({
+          return sseJsonResponse({
             jsonrpc: "2.0",
             id: body.id,
             result: {
@@ -57,7 +67,7 @@ describe("plugin-asana-connector", () => {
             },
           });
         case "tools/call":
-          return jsonResponse({
+          return sseJsonResponse({
             jsonrpc: "2.0",
             id: body.id,
             result: {

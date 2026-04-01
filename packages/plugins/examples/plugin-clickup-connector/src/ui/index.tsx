@@ -10,7 +10,7 @@ import { useState } from "react";
 // Types
 // ---------------------------------------------------------------------------
 
-interface FreshsalesStats {
+interface ClickUpStats {
   isConfigured: boolean;
   mcpUrl: string;
   toolCount: number;
@@ -18,7 +18,7 @@ interface FreshsalesStats {
   mcpRunning: boolean;
 }
 
-interface FreshsalesConfigView {
+interface ClickUpConfigView {
   hasToken: boolean;
   mcpUrl: string;
 }
@@ -43,14 +43,14 @@ const mono: React.CSSProperties = { fontFamily: "ui-monospace, SFMono-Regular, m
 // Dashboard Widget
 // ---------------------------------------------------------------------------
 
-export function FreshsalesWidget({ context }: PluginWidgetProps) {
-  const { data: stats, loading } = usePluginData<FreshsalesStats>("stats", {});
+export function ClickUpWidget({ context }: PluginWidgetProps) {
+  const { data: stats, loading } = usePluginData<ClickUpStats>("stats", {});
   if (loading || !stats) return <div style={card}><span style={{ color: "var(--muted-foreground)", fontSize: "13px" }}>Loading...</span></div>;
 
   return (
     <div style={card}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <span style={{ fontSize: "14px", fontWeight: 600 }}>Freshsales MCP</span>
+        <span style={{ fontSize: "14px", fontWeight: 600 }}>ClickUp MCP</span>
         {stats.mcpRunning
           ? <span style={badgeStyle("oklch(0.72 0.17 142)")}>Running</span>
           : <span style={badgeStyle("oklch(0.80 0.15 85)")}>{stats.isConfigured ? "Stopped" : "Not configured"}</span>}
@@ -67,9 +67,9 @@ export function FreshsalesWidget({ context }: PluginWidgetProps) {
 // Plugin Page
 // ---------------------------------------------------------------------------
 
-export function FreshsalesPage({ context }: PluginPageProps) {
-  const { data: stats, refresh } = usePluginData<FreshsalesStats>("stats", {});
-  const { data: config } = usePluginData<FreshsalesConfigView>("config", {});
+export function ClickUpPage({ context }: PluginPageProps) {
+  const { data: stats, refresh } = usePluginData<ClickUpStats>("stats", {});
+  const { data: config } = usePluginData<ClickUpConfigView>("config", {});
   const testConnection = usePluginAction("test-connection");
   const refreshTools = usePluginAction("refresh-tools");
   const [actionStatus, setActionStatus] = useState<string | null>(null);
@@ -95,12 +95,13 @@ export function FreshsalesPage({ context }: PluginPageProps) {
   return (
     <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
       <div>
-        <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--foreground)", margin: 0 }}>Freshsales Connector</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--foreground)", margin: 0 }}>ClickUp Connector</h2>
         <p style={{ fontSize: "13px", color: "var(--muted-foreground)", margin: "4px 0 0" }}>
-          Thin MCP bridge — connects to your remote Freshsales MCP server and proxies its tools to Paperclip agents.
+          Thin MCP bridge — connects to your remote ClickUp MCP server and proxies its tools to Paperclip agents.
         </p>
       </div>
 
+      {/* MCP Server Status */}
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
           <span style={{ fontSize: "14px", fontWeight: 600 }}>MCP Server</span>
@@ -120,6 +121,7 @@ export function FreshsalesPage({ context }: PluginPageProps) {
         {actionStatus && <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted-foreground)" }}>{actionStatus}</div>}
       </div>
 
+      {/* Discovered Tools */}
       {stats && stats.toolCount > 0 && (
         <div style={card}>
           <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>
@@ -133,6 +135,7 @@ export function FreshsalesPage({ context }: PluginPageProps) {
         </div>
       )}
 
+      {/* How it works */}
       <div style={card}>
         <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>How it works</div>
         <ol style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "var(--muted-foreground)", lineHeight: 1.8 }}>
@@ -143,6 +146,7 @@ export function FreshsalesPage({ context }: PluginPageProps) {
         </ol>
       </div>
 
+      {/* Config summary */}
       {config && (
         <div style={card}>
           <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "8px" }}>Configuration</div>
@@ -162,8 +166,8 @@ export function FreshsalesPage({ context }: PluginPageProps) {
 // Settings Page
 // ---------------------------------------------------------------------------
 
-export function FreshsalesSettings({ context }: PluginSettingsPageProps) {
-  const { data: config } = usePluginData<FreshsalesConfigView>("config", {});
+export function ClickUpSettings({ context }: PluginSettingsPageProps) {
+  const { data: config } = usePluginData<ClickUpConfigView>("config", {});
   const testConnection = usePluginAction("test-connection");
   const [status, setStatus] = useState<string | null>(null);
 
@@ -178,7 +182,7 @@ export function FreshsalesSettings({ context }: PluginSettingsPageProps) {
   return (
     <div style={{ maxWidth: "560px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <div>
-        <h3 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>Freshsales Settings</h3>
+        <h3 style={{ fontSize: "16px", fontWeight: 600, margin: 0 }}>ClickUp Settings</h3>
         <p style={{ fontSize: "12px", color: "var(--muted-foreground)", margin: "4px 0 0" }}>
           Configure the remote MCP URL and auth token via the plugin instance config.
         </p>

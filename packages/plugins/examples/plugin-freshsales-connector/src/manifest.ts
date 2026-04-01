@@ -6,7 +6,7 @@ const manifest: PaperclipPluginManifestV1 = {
   version: "0.1.0",
   displayName: "Freshsales Connector",
   description:
-    "Thin MCP bridge — spawns your Freshsales MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
+    "Thin MCP bridge — connects to your remote Freshsales MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
   author: "Paperclip",
   categories: ["connector"],
 
@@ -24,32 +24,26 @@ const manifest: PaperclipPluginManifestV1 = {
   instanceConfigSchema: {
     type: "object",
     properties: {
-      apiKeyRef: {
+      mcpUrl: {
         type: "string",
-        title: "Freshsales API Key (secret ref)",
+        title: "Remote MCP URL",
         description:
-          "Secret reference for the Freshsales API key, injected as FRESHSALES_API_KEY env var to the MCP server.",
+          "HTTPS URL for your remote Freshsales MCP server (for example https://freshsales.ssc.one/mcp).",
       },
-      bundleAlias: {
+      authToken: {
         type: "string",
-        title: "Bundle Alias",
+        title: "Remote MCP Auth Token",
         description:
-          "Your Freshworks bundle alias (e.g. 'acme' for acme.myfreshworks.com), injected as FRESHSALES_BUNDLE_ALIAS env var.",
+          "Bearer token sent to the remote MCP server. Use this for pre-shared tokens.",
       },
-      mcpCommand: {
+      authTokenRef: {
         type: "string",
-        title: "MCP Server Command",
-        default: "npx",
-        description: "Command to launch the MCP server (default: npx).",
-      },
-      mcpArgs: {
-        type: "string",
-        title: "MCP Server Args",
+        title: "Remote MCP Auth Token (secret ref)",
         description:
-          "Space-separated arguments for the MCP server command (e.g. '-y @your-org/mcp-server-freshsales').",
+          "Optional secret UUID reference. If authToken is set, this is ignored.",
       },
     },
-    required: ["apiKeyRef", "bundleAlias", "mcpArgs"],
+    required: ["mcpUrl"],
   },
 
   entrypoints: {

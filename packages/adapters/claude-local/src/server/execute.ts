@@ -354,6 +354,30 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   const billingType = resolveClaudeBillingType(effectiveEnv);
   const skillsDir = await buildSkillsDir(config);
 
+  // Generate MCP config for plugin-provided MCP servers
+  let mcpConfigPath: string | undefined;
+  const mcpServers = Array.isArray(context.paperclipMcpServers) ? context.paperclipMcpServers : [];
+  if (mcpServers.length > 0) {
+    const mcpConfig: Record<string, { type: string; url: string; headers?: Record<string, string> }> = {};
+    for (const entry of mcpServers) {
+      if (typeof entry !== "object" || !entry) continue;
+      const name = (entry as Record<string, unknown>).name as string;
+      const url = (entry as Record<string, unknown>).url as string;
+      const authToken = (entry as Record<string, unknown>).authToken as string | undefined;
+      if (!name || !url) continue;
+      const server: { type: string; url: string; headers?: Record<string, string> } = { type: "http", url };
+      if (authToken) {
+        server.headers = { Authorization: `Bearer ${authToken}` };
+      }
+      mcpConfig[name] = server;
+    }
+    if (Object.keys(mcpConfig).length > 0) {
+      const configFilePath = path.join(skillsDir, "mcp-servers.json");
+      await fs.writeFile(configFilePath, JSON.stringify({ mcpServers: mcpConfig }, null, 2));
+      mcpConfigPath = configFilePath;
+    }
+  }
+
   // When instructionsFilePath is configured, create a combined temp file that
   // includes both the file content and the path directive, so we only need
   // --append-system-prompt-file (Claude CLI forbids using both flags together).
@@ -428,6 +452,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       args.push("--append-system-prompt-file", effectiveInstructionsFilePath);
     }
     args.push("--add-dir", skillsDir);
+    if (mcpConfigPath) args.push("--mcp-config", mcpConfigPath);
     if (extraArgs.length > 0) args.push(...extraArgs);
     return args;
   };

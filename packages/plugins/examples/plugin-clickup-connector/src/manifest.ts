@@ -1,12 +1,12 @@
 import type { PaperclipPluginManifestV1 } from "@paperclipai/plugin-sdk";
 
 const manifest: PaperclipPluginManifestV1 = {
-  id: "paperclip-asana-connector",
+  id: "paperclip-clickup-connector",
   apiVersion: 1,
   version: "0.1.0",
-  displayName: "Asana Connector",
+  displayName: "ClickUp Connector",
   description:
-    "Thin MCP bridge — connects to your remote Asana MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
+    "Thin MCP bridge — connects to your remote ClickUp MCP server and proxies all its tools as Paperclip agent tools. Tools are discovered dynamically at startup via tools/list.",
   author: "Paperclip",
   categories: ["connector"],
 
@@ -28,7 +28,7 @@ const manifest: PaperclipPluginManifestV1 = {
         type: "string",
         title: "Remote MCP URL",
         description:
-          "HTTPS URL for your remote Asana MCP server (for example https://asana.ssc.one/mcp).",
+          "HTTPS URL for your remote ClickUp MCP server (for example https://clickup.ssc.one/mcp).",
       },
       authToken: {
         type: "string",
@@ -41,11 +41,6 @@ const manifest: PaperclipPluginManifestV1 = {
         title: "Remote MCP Auth Token (secret ref)",
         description:
           "Optional secret UUID reference. If authToken is set, this is ignored.",
-      },
-      defaultWorkspaceGid: {
-        type: "string",
-        title: "Default Workspace GID",
-        description: "Default Asana workspace GID (optional).",
       },
     },
     required: ["mcpUrl"],
@@ -62,22 +57,22 @@ const manifest: PaperclipPluginManifestV1 = {
     slots: [
       {
         type: "page",
-        id: "asana-page",
-        displayName: "Asana",
-        exportName: "AsanaPage",
-        routePath: "asana",
+        id: "clickup-page",
+        displayName: "ClickUp",
+        exportName: "ClickUpPage",
+        routePath: "clickup",
       },
       {
         type: "dashboardWidget",
-        id: "asana-widget",
-        displayName: "Asana Status",
-        exportName: "AsanaWidget",
+        id: "clickup-widget",
+        displayName: "ClickUp Status",
+        exportName: "ClickUpWidget",
       },
       {
         type: "settingsPage",
-        id: "asana-settings",
-        displayName: "Asana Settings",
-        exportName: "AsanaSettings",
+        id: "clickup-settings",
+        displayName: "ClickUp Settings",
+        exportName: "ClickUpSettings",
       },
     ],
   },

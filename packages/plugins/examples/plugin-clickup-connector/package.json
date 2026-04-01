@@ -1,7 +1,7 @@
 {
-  "name": "@paperclipai/plugin-freshsales-connector",
+  "name": "@paperclipai/plugin-clickup-connector",
   "version": "0.1.0",
-  "description": "Freshsales CRM connector plugin — bridges Freshsales contacts, deals, accounts, and tasks to Paperclip via the Freshsales MCP server",
+  "description": "ClickUp connector plugin — bridges ClickUp spaces, lists, and tasks to Paperclip via the ClickUp MCP server",
   "type": "module",
   "private": true,
   "exports": {
